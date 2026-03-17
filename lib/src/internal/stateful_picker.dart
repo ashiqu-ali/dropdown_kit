@@ -94,14 +94,14 @@ class _StatefulPickerState<T> extends State<StatefulPicker<T>> {
     _filtered.value = query.isEmpty
         ? widget.items
         : widget.items
-              .where(
-                (e) =>
-                    e.label.toLowerCase().contains(query.toLowerCase()) ||
-                    e.key.toString().toLowerCase().contains(
-                      query.toLowerCase(),
-                    ),
-              )
-              .toList();
+            .where(
+              (e) =>
+                  e.label.toLowerCase().contains(query.toLowerCase()) ||
+                  e.key.toString().toLowerCase().contains(
+                        query.toLowerCase(),
+                      ),
+            )
+            .toList();
   }
 
   @override
@@ -111,10 +111,10 @@ class _StatefulPickerState<T> extends State<StatefulPicker<T>> {
     if (widget.multiSelect && widget.selectedKeysNotifier != null) {
       return ValueListenableBuilder<List<T>>(
         valueListenable: widget.selectedKeysNotifier!,
-        builder: (_, selectedKeys, _) {
+        builder: (_, selectedKeys, __) {
           return ValueListenableBuilder<List<DropdownItem<T>>>(
             valueListenable: _filtered,
-            builder: (_, filtered, _) => PickerPanel<T>(
+            builder: (_, filtered, __) => PickerPanel<T>(
               filtered: filtered,
               selectedKeys: selectedKeys,
               onPick: widget.onPick,
@@ -145,7 +145,7 @@ class _StatefulPickerState<T> extends State<StatefulPicker<T>> {
     // ── Single mode ───────────────────────────────────────────────────────
     return ValueListenableBuilder<List<DropdownItem<T>>>(
       valueListenable: _filtered,
-      builder: (_, filtered, _) => PickerPanel<T>(
+      builder: (_, filtered, __) => PickerPanel<T>(
         filtered: filtered,
         selectedKey: widget.selectedKey,
         onPick: widget.onPick,

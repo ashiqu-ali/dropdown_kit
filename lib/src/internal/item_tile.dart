@@ -67,12 +67,12 @@ class _ItemTileState<T> extends State<ItemTile<T>> {
     return ValueListenableBuilder<bool>(
       valueListenable: _hovered,
       // ignore: unnecessary_underscores
-      builder: (_, hovered, _) {
+      builder: (_, hovered, __) {
         final bg = widget.isSelected
             ? widget.selectedColor
             : hovered
-            ? const Color(0xFFF9FAFB)
-            : Colors.transparent;
+                ? const Color(0xFFF9FAFB)
+                : Colors.transparent;
 
         return MouseRegion(
           onEnter: (_) => _hovered.value = true,
