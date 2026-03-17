@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:dropdown_kit/dropdown_kit.dart';
 
@@ -17,13 +19,13 @@ const _countries = [
 ];
 
 const _techTags = [
-  DropdownItem(key: 'flutter',   label: 'Flutter'),
-  DropdownItem(key: 'dart',      label: 'Dart'),
-  DropdownItem(key: 'firebase',  label: 'Firebase'),
-  DropdownItem(key: 'supabase',  label: 'Supabase'),
-  DropdownItem(key: 'riverpod',  label: 'Riverpod'),
-  DropdownItem(key: 'bloc',      label: 'BLoC'),
-  DropdownItem(key: 'getx',      label: 'GetX'),
+  DropdownItem(key: 'flutter', label: 'Flutter'),
+  DropdownItem(key: 'dart', label: 'Dart'),
+  DropdownItem(key: 'firebase', label: 'Firebase'),
+  DropdownItem(key: 'supabase', label: 'Supabase'),
+  DropdownItem(key: 'riverpod', label: 'Riverpod'),
+  DropdownItem(key: 'bloc', label: 'BLoC'),
+  DropdownItem(key: 'getx', label: 'GetX'),
   DropdownItem(key: 'go_router', label: 'GoRouter'),
 ];
 
@@ -44,10 +46,10 @@ class MultiSelectScreen extends StatefulWidget {
 
 class _MultiSelectScreenState extends State<MultiSelectScreen> {
   // ── State — List<T> of raw keys ───────────────────────────────────────────
-  List<String> _overlayKeys    = [];   // overlay
-  List<String> _sheetKeys      = [];   // bottom sheet
-  List<String> _dialogKeys     = [];   // dialog
-  List<String> _techKeys       = [];   // tech tags demo
+  List<String> _overlayKeys = []; // overlay
+  List<String> _sheetKeys = []; // bottom sheet
+  List<String> _dialogKeys = []; // dialog
+  List<String> _techKeys = []; // tech tags demo
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +60,6 @@ class _MultiSelectScreenState extends State<MultiSelectScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
             // ── 1. Overlay ───────────────────────────────────────────────────
             _SectionHeader(
               mode: 'Overlay',
@@ -71,8 +72,10 @@ class _MultiSelectScreenState extends State<MultiSelectScreen> {
               label: 'Countries',
               hint: 'Select countries',
               mode: DropdownMode.overlay,
-              onChanged: (List<String> keys) =>
-                  setState(() => _overlayKeys = keys),
+              onChanged: (List<String> keys) {
+                log('keys: $keys');
+                setState(() => _overlayKeys = keys);
+              },
             ),
             _ValueRow(
               'Keys',
@@ -145,8 +148,7 @@ class _MultiSelectScreenState extends State<MultiSelectScreen> {
             // ── 4. Different items — tech tags ────────────────────────────────
             _SectionHeader(
               mode: 'Different Items',
-              description:
-                  'The key type, items, colours, and shape are all '
+              description: 'The key type, items, colours, and shape are all '
                   'independent per widget instance.',
             ),
             KitDropdownMulti<String>(
