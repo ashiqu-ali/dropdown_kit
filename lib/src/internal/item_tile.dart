@@ -66,16 +66,17 @@ class _ItemTileState<T> extends State<ItemTile<T>> {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<bool>(
       valueListenable: _hovered,
-      builder: (_, hovered, __) {
+      // ignore: unnecessary_underscores
+      builder: (_, hovered, _) {
         final bg = widget.isSelected
             ? widget.selectedColor
             : hovered
-                ? const Color(0xFFF9FAFB)
-                : Colors.transparent;
+            ? const Color(0xFFF9FAFB)
+            : Colors.transparent;
 
         return MouseRegion(
           onEnter: (_) => _hovered.value = true,
-          onExit:  (_) => _hovered.value = false,
+          onExit: (_) => _hovered.value = false,
           child: GestureDetector(
             onTap: widget.onTap,
             child: AnimatedContainer(

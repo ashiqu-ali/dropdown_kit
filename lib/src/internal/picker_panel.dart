@@ -88,6 +88,8 @@ class PickerPanel<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final listMaxH = itemHeight * maxVisibleItems;
+
     final panel = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -119,13 +121,17 @@ class PickerPanel<T> extends StatelessWidget {
                 ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide:
-                      const BorderSide(color: Color(0xFFE5E7EB), width: 1),
+                  borderSide: const BorderSide(
+                    color: Color(0xFFE5E7EB),
+                    width: 1,
+                  ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide:
-                      const BorderSide(color: Color(0xFFE5E7EB), width: 1),
+                  borderSide: const BorderSide(
+                    color: Color(0xFFE5E7EB),
+                    width: 1,
+                  ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -151,11 +157,11 @@ class PickerPanel<T> extends StatelessWidget {
         else
           // ── Item list ─────────────────────────────────────────────────────
           ConstrainedBox(
-            constraints:
-                BoxConstraints(maxHeight: itemHeight * maxVisibleItems),
+            constraints: BoxConstraints(maxHeight: listMaxH),
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(vertical: 4),
               shrinkWrap: true,
+              physics: const ClampingScrollPhysics(),
               itemCount: filtered.length,
               itemExtent: itemHeight,
               itemBuilder: (_, i) {
@@ -183,8 +189,7 @@ class PickerPanel<T> extends StatelessWidget {
         if (multiSelect && onDone != null) ...[
           _divider(),
           Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -235,7 +240,7 @@ class PickerPanel<T> extends StatelessWidget {
           color: bgColor,
           borderRadius: borderRadius,
           border: Border.all(
-            color: accentColor.withOpacity(0.25),
+            color: accentColor.withValues(alpha: 0.25),
             width: 1,
           ),
           boxShadow: shadow,
@@ -246,8 +251,8 @@ class PickerPanel<T> extends StatelessWidget {
   }
 
   Widget _divider() => Divider(
-        height: 1,
-        thickness: 1,
-        color: Colors.grey.withOpacity(0.1),
-      );
+    height: 1,
+    thickness: 1,
+    color: Colors.grey.withValues(alpha: 0.1),
+  );
 }

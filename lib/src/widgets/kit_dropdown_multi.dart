@@ -8,7 +8,7 @@ import '../internal/stateful_picker.dart';
 
 const _kDefaultShadow = [
   BoxShadow(color: Color(0x1C000000), blurRadius: 20, offset: Offset(0, 6)),
-  BoxShadow(color: Color(0x0D000000), blurRadius: 5,  offset: Offset(0, 2)),
+  BoxShadow(color: Color(0x0D000000), blurRadius: 5, offset: Offset(0, 2)),
 ];
 
 /// A multi-select dropdown field that supports three presentation modes.
@@ -174,32 +174,41 @@ class _KitDropdownMultiState<T> extends State<KitDropdownMulti<T>>
   late final Animation<double> _scaleAnim;
   late final Animation<double> _chevronAnim;
 
-  final _fieldKey    = GlobalKey();
-  final _searchCtrl  = TextEditingController();
+  final _layerLink = LayerLink();
+  final _fieldKey = GlobalKey();
+  final _searchCtrl = TextEditingController();
   final _searchFocus = FocusNode();
   OverlayEntry? _overlayEntry;
+  bool _openBelow = true;
 
-  final _isOpen   = ValueNotifier<bool>(false);
+  final _isOpen = ValueNotifier<bool>(false);
   final _filtered = ValueNotifier<List<DropdownItem<T>>>([]);
 
   // Resolves chip labels from current keys.
   List<String> get _selectedLabels => widget.value
-      .map((key) => widget.items
-          .firstWhere(
-            (e) => e.key == key,
-            orElse: () => DropdownItem<T>(key: key, label: key.toString()),
-          )
-          .label)
+      .map(
+        (key) => widget.items
+            .firstWhere(
+              (e) => e.key == key,
+              orElse: () => DropdownItem<T>(key: key, label: key.toString()),
+            )
+            .label,
+      )
       .toList();
 
   @override
   void initState() {
     super.initState();
     _filtered.value = widget.items;
-    _animCtrl  = AnimationController(vsync: this, duration: widget.animationDuration);
-    _fadeAnim  = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
-    _scaleAnim = Tween<double>(begin: 0.93, end: 1.0).animate(
-        CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic));
+    _animCtrl = AnimationController(
+      vsync: this,
+      duration: widget.animationDuration,
+    );
+    _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
+    _scaleAnim = Tween<double>(
+      begin: 0.93,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic));
     _chevronAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeInOut);
   }
 
@@ -227,11 +236,33 @@ class _KitDropdownMultiState<T> extends State<KitDropdownMulti<T>>
     });
   }
 
-  Rect _fieldRect() {
+  /// Decides whether the panel should open below or above the field.
+  ///
+  /// Uses [_layerLink]'s leader [RenderBox] — which is attached to only the
+  /// trigger field via [CompositedTransformTarget] — so the measurement is
+  /// always accurate regardless of label padding or widget nesting.
+  ///
+  /// Accounts for the on-screen keyboard ([viewInsets.bottom]) so the panel
+  /// never hides behind it. Computed once when the overlay opens.
+  bool _computeOpenBelow() {
     final box = _fieldKey.currentContext?.findRenderObject() as RenderBox?;
-    if (box == null) return Rect.zero;
-    final pos = box.localToGlobal(Offset.zero);
-    return Rect.fromLTWH(pos.dx, pos.dy, box.size.width, box.size.height);
+    if (box == null || !box.attached) return true;
+
+    final fieldOffset = box.localToGlobal(Offset.zero);
+    final fieldH = box.size.height;
+    final mq = MediaQuery.of(context);
+    final screenH = mq.size.height;
+    final keyboardH = mq.viewInsets.bottom;
+
+    final spaceBelow = screenH - keyboardH - fieldOffset.dy - fieldH - 8;
+    final spaceAbove = fieldOffset.dy - 8;
+
+    final panelH =
+        widget.itemHeight * widget.maxVisibleItems +
+        (widget.searchEnabled ? 68.0 : 0.0) +
+        64;
+
+    return spaceBelow >= panelH || spaceBelow >= spaceAbove;
   }
 
   // ── Open dispatcher ───────────────────────────────────────────────────────
@@ -240,9 +271,12 @@ class _KitDropdownMultiState<T> extends State<KitDropdownMulti<T>>
     _filtered.value = widget.items;
     _searchCtrl.clear();
     switch (widget.mode) {
-      case DropdownMode.overlay:     _openOverlay();
-      case DropdownMode.bottomSheet: _openBottomSheet();
-      case DropdownMode.dialog:      _openDialog();
+      case DropdownMode.overlay:
+        _openOverlay();
+      case DropdownMode.bottomSheet:
+        _openBottomSheet();
+      case DropdownMode.dialog:
+        _openDialog();
     }
   }
 
@@ -258,6 +292,7 @@ class _KitDropdownMultiState<T> extends State<KitDropdownMulti<T>>
 
   void _openOverlay() {
     if (_isOpen.value) return;
+    _openBelow = _computeOpenBelow(); // decide direction before building
     _overlayEntry = _buildOverlayEntry();
     Overlay.of(context).insert(_overlayEntry!);
     _animCtrl.forward();
@@ -283,66 +318,71 @@ class _KitDropdownMultiState<T> extends State<KitDropdownMulti<T>>
   }
 
   OverlayEntry _buildOverlayEntry() {
-    return OverlayEntry(builder: (ctx) {
-      final rect    = _fieldRect();
-      final screenH = MediaQuery.of(ctx).size.height;
-      final below   = screenH - rect.bottom - 8;
-      final above   = rect.top - 8;
-      final totalH  = widget.itemHeight * widget.maxVisibleItems +
-          (widget.searchEnabled ? 60.0 : 0.0) + 64;
-      final openBelow = below >= totalH || below >= above;
+    const gap = 6.0;
 
-      return GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onTap: _closeOverlay,
-        child: Stack(children: [
-          Positioned(
-            left:   rect.left,
-            top:    openBelow ? rect.bottom + 6 : null,
-            bottom: openBelow ? null : screenH - rect.top + 6,
-            width:  rect.width,
-            child: FadeTransition(
-              opacity: _fadeAnim,
-              child: ScaleTransition(
-                scale: _scaleAnim,
-                alignment: openBelow
-                    ? Alignment.topCenter
-                    : Alignment.bottomCenter,
-                child: GestureDetector(
-                  onTap: () {},
-                  child: ValueListenableBuilder<List<DropdownItem<T>>>(
-                    valueListenable: _filtered,
-                    builder: (_, filtered, __) => PickerPanel<T>(
-                      filtered: filtered,
-                      selectedKeys: widget.value,
-                      onPick: _toggleKey,
-                      searchCtrl: _searchCtrl,
-                      searchFocus: _searchFocus,
-                      searchEnabled: widget.searchEnabled,
-                      searchHint: widget.searchHint,
-                      onSearch: _onSearch,
-                      itemHeight: widget.itemHeight,
-                      maxVisibleItems: widget.maxVisibleItems,
-                      borderRadius: widget.dropdownBorderRadius,
-                      bgColor: widget.panelColor,
-                      selectedItemColor: widget.selectedItemColor,
-                      selectedItemTextColor: widget.selectedItemTextColor,
-                      checkColor: widget.checkColor,
-                      textColor: widget.textColor,
-                      accentColor: widget.focusBorderColor,
-                      shadow: widget.dropdownShadow ?? _kDefaultShadow,
-                      multiSelect: true,
-                      onDone: _closeOverlay,
-                      selectedCount: widget.value.length,
+    return OverlayEntry(
+      builder: (_) {
+        return GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: _closeOverlay,
+          child: Stack(
+            children: [
+              CompositedTransformFollower(
+                link: _layerLink,
+                showWhenUnlinked: false,
+                targetAnchor: _openBelow
+                    ? Alignment.bottomLeft
+                    : Alignment.topLeft,
+                followerAnchor: _openBelow
+                    ? Alignment.topLeft
+                    : Alignment.bottomLeft,
+                offset: _openBelow
+                    ? const Offset(0, gap)
+                    : const Offset(0, -gap),
+                child: FadeTransition(
+                  opacity: _fadeAnim,
+                  child: ScaleTransition(
+                    scale: _scaleAnim,
+                    alignment: _openBelow
+                        ? Alignment.topCenter
+                        : Alignment.bottomCenter,
+                    child: GestureDetector(
+                      onTap: () {},
+                      child: ValueListenableBuilder<List<DropdownItem<T>>>(
+                        valueListenable: _filtered,
+                        builder: (_, filtered, _) => PickerPanel<T>(
+                          filtered: filtered,
+                          selectedKeys: widget.value,
+                          onPick: _toggleKey,
+                          searchCtrl: _searchCtrl,
+                          searchFocus: _searchFocus,
+                          searchEnabled: widget.searchEnabled,
+                          searchHint: widget.searchHint,
+                          onSearch: _onSearch,
+                          itemHeight: widget.itemHeight,
+                          maxVisibleItems: widget.maxVisibleItems,
+                          borderRadius: widget.dropdownBorderRadius,
+                          bgColor: widget.panelColor,
+                          selectedItemColor: widget.selectedItemColor,
+                          selectedItemTextColor: widget.selectedItemTextColor,
+                          checkColor: widget.checkColor,
+                          textColor: widget.textColor,
+                          accentColor: widget.focusBorderColor,
+                          shadow: widget.dropdownShadow ?? _kDefaultShadow,
+                          multiSelect: true,
+                          onDone: _closeOverlay,
+                          selectedCount: widget.value.length,
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
+            ],
           ),
-        ]),
-      );
-    });
+        );
+      },
+    );
   }
 
   // ── Bottom-sheet ──────────────────────────────────────────────────────────
@@ -350,8 +390,7 @@ class _KitDropdownMultiState<T> extends State<KitDropdownMulti<T>>
   void _openBottomSheet() {
     _isOpen.value = true;
     // Local notifier seeded with current selection — owned by this session.
-    final localSelected =
-        ValueNotifier<List<T>>(List<T>.from(widget.value));
+    final localSelected = ValueNotifier<List<T>>(List<T>.from(widget.value));
 
     showModalBottomSheet(
       context: context,
@@ -395,9 +434,7 @@ class _KitDropdownMultiState<T> extends State<KitDropdownMulti<T>>
 
   void _openDialog() {
     _isOpen.value = true;
-    final localSelected =
-        ValueNotifier<List<T>>(List<T>.from(widget.value));
-
+    final localSelected = ValueNotifier<List<T>>(List<T>.from(widget.value));
     showDialog(
       context: context,
       builder: (_) => SheetDialogWrapper(
@@ -464,10 +501,14 @@ class _KitDropdownMultiState<T> extends State<KitDropdownMulti<T>>
     _filtered.value = query.isEmpty
         ? widget.items
         : widget.items
-            .where((e) =>
-                e.label.toLowerCase().contains(query.toLowerCase()) ||
-                e.key.toString().toLowerCase().contains(query.toLowerCase()))
-            .toList();
+              .where(
+                (e) =>
+                    e.label.toLowerCase().contains(query.toLowerCase()) ||
+                    e.key.toString().toLowerCase().contains(
+                      query.toLowerCase(),
+                    ),
+              )
+              .toList();
     _safeRebuildOverlay();
   }
 
@@ -481,11 +522,10 @@ class _KitDropdownMultiState<T> extends State<KitDropdownMulti<T>>
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Optional label
         if (widget.label != null)
           ValueListenableBuilder<bool>(
             valueListenable: _isOpen,
-            builder: (_, open, __) => Padding(
+            builder: (_, open, _) => Padding(
               padding: const EdgeInsets.only(bottom: 6),
               child: Text(
                 widget.label!,
@@ -498,69 +538,73 @@ class _KitDropdownMultiState<T> extends State<KitDropdownMulti<T>>
             ),
           ),
 
-        // Trigger field
-        GestureDetector(
+        CompositedTransformTarget(
           key: _fieldKey,
-          onTap: _toggle,
-          child: ValueListenableBuilder<bool>(
-            valueListenable: _isOpen,
-            builder: (_, open, __) => AnimatedContainer(
-              duration: widget.animationDuration,
-              constraints:
-                  BoxConstraints(minHeight: widget.fieldHeight),
-              decoration: BoxDecoration(
-                color: widget.fieldColor,
-                borderRadius: widget.borderRadius,
-                border: Border.all(
-                  color: open ? widget.focusBorderColor : widget.borderColor,
-                  width: widget.borderWidth,
+          link: _layerLink,
+          child: GestureDetector(
+            onTap: _toggle,
+            child: ValueListenableBuilder<bool>(
+              valueListenable: _isOpen,
+              builder: (_, open, _) => AnimatedContainer(
+                duration: widget.animationDuration,
+                constraints: BoxConstraints(minHeight: widget.fieldHeight),
+                decoration: BoxDecoration(
+                  color: widget.fieldColor,
+                  borderRadius: widget.borderRadius,
+                  border: Border.all(
+                    color: open ? widget.focusBorderColor : widget.borderColor,
+                    width: widget.borderWidth,
+                  ),
                 ),
-              ),
-              child: Padding(
-                padding: widget.contentPadding,
-                child: Row(children: [
-                  Expanded(
-                    child: widget.value.isEmpty
-                        ? Text(
-                            widget.hint,
-                            style: TextStyle(
-                              fontSize: 15,
-                              color: widget.hintColor,
-                              fontWeight: FontWeight.w400,
-                            ),
-                          )
-                        : Wrap(
-                            spacing: 6,
-                            runSpacing: 4,
-                            children: List.generate(
-                              widget.value.length,
-                              (i) => KitChip(
-                                label: labels[i],
-                                color: widget.chipColor,
-                                textColor: widget.chipTextColor,
-                                onRemove: () {
-                                  final updated =
-                                      List<T>.from(widget.value)
+                child: Padding(
+                  padding: widget.contentPadding,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: widget.value.isEmpty
+                            ? Text(
+                                widget.hint,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  color: widget.hintColor,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              )
+                            : Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: List.generate(
+                                  widget.value.length,
+                                  (i) => KitChip(
+                                    label: labels[i],
+                                    color: widget.chipColor,
+                                    textColor: widget.chipTextColor,
+                                    onRemove: () {
+                                      final updated = List<T>.from(widget.value)
                                         ..removeAt(i);
-                                  widget.onChanged(updated);
-                                },
+                                      widget.onChanged(updated);
+                                    },
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
+                      ),
+                      const SizedBox(width: 8),
+                      RotationTransition(
+                        turns: Tween<double>(
+                          begin: 0,
+                          end: 0.5,
+                        ).animate(_chevronAnim),
+                        child: Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          color: open
+                              ? widget.focusBorderColor
+                              : widget.iconColor,
+                          size: 22,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  RotationTransition(
-                    turns: Tween<double>(begin: 0, end: 0.5)
-                        .animate(_chevronAnim),
-                    child: Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      color: open
-                          ? widget.focusBorderColor
-                          : widget.iconColor,
-                      size: 22,
-                    ),
-                  ),
-                ]),
+                ),
               ),
             ),
           ),
