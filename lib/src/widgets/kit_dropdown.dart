@@ -374,32 +374,44 @@ class _KitDropdownState<T> extends State<KitDropdown<T>>
   }
 
   OverlayEntry _buildOverlayEntry() {
-    // Gap between field edge and panel edge.
     const gap = 6.0;
+    const edgePad = 8.0; // minimum gap from screen left/right edge
 
     return OverlayEntry(
-      builder: (_) {
+      builder: (ctx) {
+        final screenW = MediaQuery.of(ctx).size.width;
+        final screenH = MediaQuery.of(ctx).size.height;
+
+        // Re-read the field rect every time the overlay rebuilds so the panel
+        // always tracks the correct position even after scroll.
+        final box = _fieldKey.currentContext?.findRenderObject() as RenderBox?;
+        final fieldRect = box != null
+            ? Rect.fromLTWH(
+                box.localToGlobal(Offset.zero).dx,
+                box.localToGlobal(Offset.zero).dy,
+                box.size.width,
+                box.size.height,
+              )
+            : Rect.zero;
+
+        // Clamp left so the panel never overflows left or right screen edge.
+        final panelWidth = fieldRect.width;
+        final rawLeft = fieldRect.left;
+        final clampedLeft = rawLeft.clamp(
+          edgePad,
+          screenW - panelWidth - edgePad,
+        );
+
         return GestureDetector(
           behavior: HitTestBehavior.translucent,
           onTap: _closeOverlay,
           child: Stack(
             children: [
-              // CompositedTransformFollower keeps the panel glued to the field
-              // as the user scrolls — the LayerLink is the anchor.
-              CompositedTransformFollower(
-                link: _layerLink,
-                showWhenUnlinked: false,
-                // When opening below: top of panel = bottom of field + gap.
-                // When opening above: bottom of panel = top of field + gap (inverted).
-                targetAnchor: _openBelow
-                    ? Alignment.bottomLeft
-                    : Alignment.topLeft,
-                followerAnchor: _openBelow
-                    ? Alignment.topLeft
-                    : Alignment.bottomLeft,
-                offset: _openBelow
-                    ? const Offset(0, gap)
-                    : const Offset(0, -gap),
+              Positioned(
+                left: clampedLeft,
+                top: _openBelow ? fieldRect.bottom + gap : null,
+                bottom: _openBelow ? null : screenH - fieldRect.top + gap,
+                width: panelWidth,
                 child: FadeTransition(
                   opacity: _fadeAnim,
                   child: ScaleTransition(
@@ -408,12 +420,10 @@ class _KitDropdownState<T> extends State<KitDropdown<T>>
                         ? Alignment.topCenter
                         : Alignment.bottomCenter,
                     child: GestureDetector(
-                      // Absorb taps on the panel so they don't bubble to the
-                      // dismiss GestureDetector above.
                       onTap: () {},
                       child: ValueListenableBuilder<List<DropdownItem<T>>>(
                         valueListenable: _filtered,
-                        builder: (_, filtered, _) => PickerPanel<T>(
+                        builder: (_, filtered, __) => PickerPanel<T>(
                           filtered: filtered,
                           selectedKey: widget.value,
                           onPick: _pickSingle,
@@ -451,7 +461,7 @@ class _KitDropdownState<T> extends State<KitDropdown<T>>
     _isOpen.value = true;
     showModalBottomSheet(
       context: context,
-      useRootNavigator: true,
+      useRootNavigator: true, // renders above BottomNavigationBar
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => SheetDialogWrapper(
@@ -550,7 +560,7 @@ class _KitDropdownState<T> extends State<KitDropdown<T>>
         if (widget.label != null)
           ValueListenableBuilder<bool>(
             valueListenable: _isOpen,
-            builder: (_, open, _) => Padding(
+            builder: (_, open, __) => Padding(
               padding: const EdgeInsets.only(bottom: 6),
               child: Text(
                 widget.label!,
@@ -573,7 +583,7 @@ class _KitDropdownState<T> extends State<KitDropdown<T>>
             onTap: _toggle,
             child: ValueListenableBuilder<bool>(
               valueListenable: _isOpen,
-              builder: (_, open, _) => AnimatedContainer(
+              builder: (_, open, __) => AnimatedContainer(
                 duration: widget.animationDuration,
                 height: widget.fieldHeight,
                 decoration: BoxDecoration(

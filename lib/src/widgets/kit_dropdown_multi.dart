@@ -319,26 +319,39 @@ class _KitDropdownMultiState<T> extends State<KitDropdownMulti<T>>
 
   OverlayEntry _buildOverlayEntry() {
     const gap = 6.0;
+    const edgePad = 8.0;
 
     return OverlayEntry(
-      builder: (_) {
+      builder: (ctx) {
+        final screenW = MediaQuery.of(ctx).size.width;
+        final screenH = MediaQuery.of(ctx).size.height;
+
+        final box = _fieldKey.currentContext?.findRenderObject() as RenderBox?;
+        final fieldRect = box != null
+            ? Rect.fromLTWH(
+                box.localToGlobal(Offset.zero).dx,
+                box.localToGlobal(Offset.zero).dy,
+                box.size.width,
+                box.size.height,
+              )
+            : Rect.zero;
+
+        final panelWidth = fieldRect.width;
+        final clampedLeft = fieldRect.left.clamp(
+          edgePad,
+          screenW - panelWidth - edgePad,
+        );
+
         return GestureDetector(
           behavior: HitTestBehavior.translucent,
           onTap: _closeOverlay,
           child: Stack(
             children: [
-              CompositedTransformFollower(
-                link: _layerLink,
-                showWhenUnlinked: false,
-                targetAnchor: _openBelow
-                    ? Alignment.bottomLeft
-                    : Alignment.topLeft,
-                followerAnchor: _openBelow
-                    ? Alignment.topLeft
-                    : Alignment.bottomLeft,
-                offset: _openBelow
-                    ? const Offset(0, gap)
-                    : const Offset(0, -gap),
+              Positioned(
+                left: clampedLeft,
+                top: _openBelow ? fieldRect.bottom + gap : null,
+                bottom: _openBelow ? null : screenH - fieldRect.top + gap,
+                width: panelWidth,
                 child: FadeTransition(
                   opacity: _fadeAnim,
                   child: ScaleTransition(
@@ -350,7 +363,7 @@ class _KitDropdownMultiState<T> extends State<KitDropdownMulti<T>>
                       onTap: () {},
                       child: ValueListenableBuilder<List<DropdownItem<T>>>(
                         valueListenable: _filtered,
-                        builder: (_, filtered, _) => PickerPanel<T>(
+                        builder: (_, filtered, __) => PickerPanel<T>(
                           filtered: filtered,
                           selectedKeys: widget.value,
                           onPick: _toggleKey,
@@ -522,10 +535,11 @@ class _KitDropdownMultiState<T> extends State<KitDropdownMulti<T>>
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
+        // Optional label
         if (widget.label != null)
           ValueListenableBuilder<bool>(
             valueListenable: _isOpen,
-            builder: (_, open, _) => Padding(
+            builder: (_, open, __) => Padding(
               padding: const EdgeInsets.only(bottom: 6),
               child: Text(
                 widget.label!,
@@ -538,6 +552,9 @@ class _KitDropdownMultiState<T> extends State<KitDropdownMulti<T>>
             ),
           ),
 
+        // Trigger field — wrapped in CompositedTransformTarget so the
+        // LayerLink tracks its position for the overlay follower.
+        // _fieldKey gives us the exact RenderBox for flip-direction math.
         CompositedTransformTarget(
           key: _fieldKey,
           link: _layerLink,
@@ -545,7 +562,7 @@ class _KitDropdownMultiState<T> extends State<KitDropdownMulti<T>>
             onTap: _toggle,
             child: ValueListenableBuilder<bool>(
               valueListenable: _isOpen,
-              builder: (_, open, _) => AnimatedContainer(
+              builder: (_, open, __) => AnimatedContainer(
                 duration: widget.animationDuration,
                 constraints: BoxConstraints(minHeight: widget.fieldHeight),
                 decoration: BoxDecoration(
