@@ -20,12 +20,9 @@ dev_dependencies:
 
 flutter:
 
-topics:
-  - dropdown        
-  - select          
+topics:     
   - multi-select    
   - search          
-  - form            
   - overlay         
   - bottom-sheet    
   - dialog          
